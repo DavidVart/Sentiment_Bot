@@ -1,0 +1,7 @@
+# Hard risk limits; breach → flatten + terminate (kill switch)
+risk:
+  max_premium_at_risk: 50000.0
+  max_vega: 200.0
+  max_delta: 500.0
+  max_open_contracts: 100
+  max_daily_loss: 5000.0

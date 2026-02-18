@@ -1,0 +1,23 @@
+# Sentiment: scoring weights, half-lives, and news/social query config
+# NewsAPI search queries (universe + macro)
+news_queries:
+  universe:
+    - "SPY"
+    - "QQQ"
+    - "AAPL"
+    - "S&P 500"
+    - "Nasdaq"
+  macro:
+    - "Federal Reserve"
+    - "CPI"
+    - "inflation"
+    - "recession"
+    - "unemployment"
+
+# Feature build: recency half-life (hours), momentum window (number of 15-min bars)
+features:
+  recency_half_life_hours: 4.0
+  momentum_window_bars: 4
+  # Source weight for sent_macro_topic: news > social (news weight, social weight)
+  macro_news_weight: 1.0
+  macro_social_weight: 0.5

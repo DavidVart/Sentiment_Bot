@@ -1,0 +1,23 @@
+# API endpoints and key references (keys from env vars only)
+polymarket:
+  gamma_base_url: "https://gamma-api.polymarket.com"
+  clob_base_url: "https://clob.polymarket.com"
+  # Env: POLYMARKET_PRIVATE_KEY (L1) or POLYMARKET_API_KEY (L2)
+kalshi:
+  base_url: "https://api.elections.kalshi.com/trade-api/v2"
+  # Public API (no auth needed for market data). Env: KALSHI_API_KEY (optional, for trading)
+polygon:
+  base_url: "https://api.polygon.io"
+  # Env: MASSIVE_API (Polygon.io API key); free tier 5 calls/min
+tradier:
+  sandbox_url: "https://sandbox.tradier.com/v1"
+  production_url: "https://api.tradier.com/v1"
+  # Env: TRADIER_API_TOKEN (Bearer token)
+newsapi:
+  base_url: "https://newsapi.org/v2"
+  # Env: NEWS_API (API key)
+reddit:
+  # PRAW: https://www.reddit.com/prefs/apps
+  # Env: REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT
+postgres:
+  # Env: DATABASE_URL or POSTGRES_HOST, POSTGRES_PORT, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB

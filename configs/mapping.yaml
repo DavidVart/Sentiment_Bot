@@ -1,0 +1,92 @@
+# Prediction-market events -> underlyings mapping (deterministic)
+# event_slug: unique identifier for the event
+# token_ids: list of token_ids/tickers that have pm_features data
+# affected_underlyings: [SPY, QQQ, AAPL] (max 3 for MVP)
+# direction_hypothesis: for analysis only; RL learns end-to-end
+
+# ──── Tariff policy (broad equity impact: trade policy uncertainty) ────
+- event_slug: "tariff-decision-release"
+  platforms: [kalshi]
+  token_ids:
+    kalshi_1: "KXTARIFFDECISIONRELEASE-26MAR1"
+    kalshi_2: "KXTARIFFDECISIONRELEASE-26FEB1"
+    kalshi_3: "KXTARIFFDECISIONRELEASE-26MAR17"
+    kalshi_4: "KXTARIFFDECISIONRELEASE-26APR01"
+  affected_underlyings: [SPY, QQQ]
+  direction_hypothesis: "tariff escalation -> higher IV, risk-off"
+  event_date: ""
+
+# ──── Treasury 10-year yield (rates outlook, equity discount rates) ────
+- event_slug: "treasury-10y-yield"
+  platforms: [kalshi]
+  token_ids:
+    kalshi_1: "KXTNOTED-26FEB16-B4.07"
+    kalshi_2: "KXTNOTED-26FEB16-B4.04"
+    kalshi_3: "KXTNOTED-26FEB16-T3.91"
+    kalshi_4: "KXTNOTED-26FEB16-B4.01"
+  affected_underlyings: [SPY, QQQ]
+  direction_hypothesis: "rising yields -> equity pressure, higher IV"
+  event_date: "2026-02-16"
+
+# ──── WTI crude oil (energy sector, inflation expectations) ────
+- event_slug: "wti-oil-price"
+  platforms: [kalshi]
+  token_ids:
+    kalshi_1: "KXWTIW-26FEB13-B67.5"
+    kalshi_2: "KXWTIW-26FEB13-B65.5"
+    kalshi_3: "KXWTIW-26FEB13-B63.5"
+    kalshi_4: "KXWTIW-26FEB13-B61.5"
+    kalshi_5: "KXWTIW-26FEB13-B59.5"
+  affected_underlyings: [SPY, QQQ]
+  direction_hypothesis: "oil spike -> inflation fear -> higher IV"
+  event_date: "2026-02-13"
+
+# ──── World leaders out (geopolitical risk premium) ────
+- event_slug: "world-leaders-out-2026"
+  platforms: [kalshi]
+  token_ids:
+    kalshi_putin: "KXLEADERSOUT-27JAN01-VPUTRUS"
+    kalshi_zelensky: "KXLEADERSOUT-27JAN01-VZELUKR"
+    kalshi_starmer: "KXLEADERSOUT-27JAN01-KSTAUK"
+    kalshi_netanyahu: "KXLEADERSOUT-27JAN01-BNETISR"
+    kalshi_macron: "KXLEADERSOUT-27JAN01-EMACFRA"
+  affected_underlyings: [SPY, QQQ]
+  direction_hypothesis: "leadership change -> geopolitical vol"
+  event_date: "2027-01-01"
+
+# ──── Bitcoin Up/Down (crypto risk sentiment, correlated with growth/tech) ────
+- event_slug: "bitcoin-up-down"
+  platforms: [polymarket]
+  token_ids:
+    poly_1: "109636562876650228691226199870960158224290879825392176427947"
+    poly_2: "101217520496868238599046159235902187533693319280219184589128"
+    poly_3: "214249567484822338266821670947782555109321761874184313837792"
+    poly_4: "181083483028698236912505441608118616207583561276549745664628"
+  affected_underlyings: [SPY, QQQ]
+  direction_hypothesis: "BTC sell-off -> risk-off, tech/growth pressure"
+  event_date: "2026-02-16"
+
+# ──── Crypto alt prices (broader crypto risk appetite, tech correlation) ────
+- event_slug: "crypto-alts-up-down"
+  platforms: [polymarket]
+  token_ids:
+    poly_eth: "79281747658103947355447856367268229796731189134411284761488090622981909493692"
+    poly_sol: "18853625712265568647494909632869290465492495324556438319059777606458311479635"
+    poly_xrp: "87293344068117929005503728330854854067283410487958405412289480819821587416748"
+  affected_underlyings: [QQQ]
+  direction_hypothesis: "crypto risk appetite proxy for tech growth"
+  event_date: "2026-02-16"
+
+# ──── IPO activity (economic confidence, risk appetite proxy) ────
+- event_slug: "olipop-ipo-timing"
+  platforms: [kalshi]
+  token_ids:
+    kalshi_1: "KXIPOOLIPOP-27JUN01"
+    kalshi_2: "KXIPOOLIPOP-27MAY01"
+    kalshi_3: "KXIPOOLIPOP-27APR01"
+  affected_underlyings: [SPY, QQQ, AAPL]
+  direction_hypothesis: "IPO window opening -> risk-on sentiment"
+  event_date: ""
+
+# Note: AAPL also uses auto-discovered tokens from pm_features as fallback
+# when no explicit mapping exists (see align.py _auto_discover_token_ids).

@@ -1,0 +1,5 @@
+# MVP universe (max 3 underlyings)
+underlyings: [SPY, QQQ, AAPL]
+# Expiries for contract selection: ~7D, ~14D, ~30D
+expiry_targets_days: [7, 14, 30]
+# Strikes: ATM, +/-1 sigma, +/-2 sigma (5 per expiry)

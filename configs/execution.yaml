@@ -1,0 +1,13 @@
+# Execution simulator and reward parameters
+execution:
+  fee_per_contract: 0.65
+  min_bar_delay: 1
+  spread_threshold_pct: 0.05
+  slippage_bps_per_pct_volume: 2.0
+
+reward:
+  lambda_transaction_cost: 1.0
+  lambda_drawdown_increment: 2.0
+
+episode:
+  max_drawdown_pct: 0.10
