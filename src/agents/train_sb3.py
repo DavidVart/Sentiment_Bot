@@ -71,6 +71,7 @@ def train_agent(
     total_timesteps: int = 100_000,
     seed: int = 0,
     log_dir: str | Path | None = None,
+    callback: Any = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -108,7 +109,7 @@ def train_agent(
     else:
         raise ValueError(f"algorithm must be 'ppo' or 'sac', got {algorithm!r}")
 
-    model.learn(total_timesteps=total_timesteps)
+    model.learn(total_timesteps=total_timesteps, callback=callback)
     return model
 
 

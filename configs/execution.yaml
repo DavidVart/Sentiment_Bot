@@ -6,8 +6,11 @@ execution:
   slippage_bps_per_pct_volume: 2.0
 
 reward:
+  # All dollar values normalized as % of equity in the reward function.
   lambda_transaction_cost: 1.0
-  lambda_drawdown_increment: 2.0
+  lambda_drawdown_increment: 0.1    # Low: DD penalty mustn't double-count per-bar PnL
+  inaction_penalty: 0.02            # 0.02/bar * 600 bars = -12.0 for doing nothing
+  exposure_bonus: 0.01              # 0.01/bar * 600 bars = +6.0 for holding positions
 
 episode:
-  max_drawdown_pct: 0.10
+  max_drawdown_pct: 0.15            # 15% drawdown terminates episode

@@ -1,8 +1,9 @@
 """Kalshi API client: events, markets, and historical candlesticks.
 
-Authentication uses RSA-PSS signatures (SHA-256).  Required env vars:
+Authentication uses RSA-PSS signatures (SHA-256).  Env vars:
     KALSHI_API_KEY            – API key ID (UUID)
-    KALSHI_PRIVATE_KEY_PATH   – path to PEM private key file
+    KALSHI_PRIVATE_KEY_PATH   – path to PEM private key file (local dev)
+    KALSHI_PRIVATE_KEY        – inline PEM string (e.g. Cloud Run Secret Manager)
 """
 
 from __future__ import annotations
@@ -36,6 +37,17 @@ def _load_private_key(key_path: str):
         return serialization.load_pem_private_key(
             f.read(), password=None, backend=default_backend(),
         )
+
+
+def _load_private_key_from_string(pem_str: str):
+    """Load an RSA private key from a PEM string (e.g. env var in Cloud Run)."""
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+
+    pem_bytes = pem_str.strip().encode("utf-8") if isinstance(pem_str, str) else pem_str
+    return serialization.load_pem_private_key(
+        pem_bytes, password=None, backend=default_backend(),
+    )
 
 
 def _sign_request(private_key, timestamp_ms: int, method: str, path: str) -> str:
@@ -90,22 +102,30 @@ def _dollars_to_prob(raw: Any) -> float | None:
 class KalshiClient:
     """Read-only client for Kalshi API (events, markets, candlesticks).
 
-    Authenticates with RSA-PSS signed headers when ``KALSHI_API_KEY``
-    and ``KALSHI_PRIVATE_KEY_PATH`` are set.  Falls back to unauthenticated
-    requests (public endpoints only) when keys are absent.
+    Authenticates with RSA-PSS when ``KALSHI_API_KEY`` and either
+    ``KALSHI_PRIVATE_KEY_PATH`` (file) or ``KALSHI_PRIVATE_KEY`` (inline PEM)
+    are set.  Falls back to unauthenticated requests when keys are absent.
     """
 
     def __init__(self, base_url: str | None = None) -> None:
         self.base_url = (base_url or KALSHI_DEFAULT_BASE).rstrip("/")
         self._api_key = os.environ.get("KALSHI_API_KEY", "")
-        key_path = os.environ.get("KALSHI_PRIVATE_KEY_PATH", "")
         self._private_key = None
+        key_path = os.environ.get("KALSHI_PRIVATE_KEY_PATH", "")
         if self._api_key and key_path and Path(key_path).exists():
             try:
                 self._private_key = _load_private_key(key_path)
                 logger.info("Kalshi RSA auth enabled (key_id=%s…)", self._api_key[:8])
             except Exception as exc:
-                logger.warning("Failed to load Kalshi private key: %s", exc)
+                logger.warning("Failed to load Kalshi private key from file: %s", exc)
+        if not self._private_key and self._api_key:
+            pem_str = os.environ.get("KALSHI_PRIVATE_KEY", "").strip()
+            if pem_str:
+                try:
+                    self._private_key = _load_private_key_from_string(pem_str)
+                    logger.info("Kalshi RSA auth enabled from KALSHI_PRIVATE_KEY (key_id=%s…)", self._api_key[:8])
+                except Exception as exc:
+                    logger.warning("Failed to load Kalshi private key from env: %s", exc)
 
     def _auth_headers(self, method: str, full_url: str) -> dict[str, str]:
         """Build authentication headers for a request."""

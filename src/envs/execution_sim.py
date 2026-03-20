@@ -20,6 +20,7 @@ class PendingOrder:
     spread: float
     volume: float
     fill_at_bar: int
+    strike: float = 0.0  # actual strike price (fixed at order time)
 
 
 def _load_execution_config() -> dict[str, Any]:
@@ -44,6 +45,7 @@ class Fill:
     qty: int
     price: float
     fee: float
+    strike: float = 0.0  # actual strike price (fixed at order time)
 
 
 class ExecutionSimulator:
@@ -75,6 +77,7 @@ class ExecutionSimulator:
         spread: float,
         volume: float,
         current_bar: int,
+        strike: float = 0.0,
     ) -> int | None:
         """Submit order; returns order_id or None if spread exceeds threshold."""
         if qty == 0:
@@ -93,6 +96,7 @@ class ExecutionSimulator:
                 spread=spread,
                 volume=volume,
                 fill_at_bar=fill_at,
+                strike=strike,
             )
         )
         return self._next_order_id
@@ -124,7 +128,14 @@ class ExecutionSimulator:
                 fill_price *= 1 - slippage_pct
             fee = self.fee_per_contract * abs(po.qty)
             fills.append(
-                Fill(order_id=po.order_id, contract_key=po.contract_key, qty=po.qty, price=fill_price, fee=fee)
+                Fill(
+                    order_id=po.order_id,
+                    contract_key=po.contract_key,
+                    qty=po.qty,
+                    price=fill_price,
+                    fee=fee,
+                    strike=po.strike,
+                )
             )
         self._pending = still_pending
         return fills

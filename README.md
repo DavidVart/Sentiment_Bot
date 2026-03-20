@@ -84,6 +84,10 @@ bash scripts/install_with_legacy_deps.sh
 
 Core dependencies (see `pyproject.toml`) include: `gymnasium`, `numpy`, `pandas`, `psycopg2-binary`, `pyyaml`, `python-dotenv`, `stable-baselines3`, `scipy`, `matplotlib`, `streamlit`, `plotly`, and connectors (e.g. `py-clob-client`, `requests`, `httpx`) for Polymarket/Kalshi and market data.
 
+### Sentiment analysis (AI)
+
+Sentiment scoring uses **FinBERT** (ProsusAI/finbert) for news (e.g. NewsAPI) and **VADER** for other sources (e.g. Reddit). FinBERT is loaded with a timeout; if it does not load in time (e.g. 120s), the pipeline falls back to VADER for all documents. The dashboard shows which model scored each headline (Market Signals) and a summary by model on the Overview page. See `src/connectors/sentiment/scoring.py` and pipeline step 6 (`score_sentiment`).
+
 ### Environment variables
 
 Use a `.env` file in the project root (do not commit secrets). Example:
@@ -206,13 +210,42 @@ python scripts/generate_reports.py --ablation-json ablation_results.json [--outp
 
 ## 8. Dashboard
 
-Streamlit dashboard for performance, exposure, signal inspector, trade log, ablation comparison, and event case studies:
+**Web dashboard (primary):** FastAPI backend + Next.js frontend. Four pages: Overview, Market Signals, Performance, Trade Impact. Data is read from PostgreSQL and from precomputed snapshot tables (filled by the daily pipeline + snapshot script).
+
+**Run locally:**
 
 ```bash
-streamlit run src/dashboard/app.py
+cd web && npm install && npm run build && cd ..
+uvicorn src.api.main:app --host 0.0.0.0 --port 8080
+# Open http://localhost:8080
 ```
 
-From the project root. Configure data in the sidebar (underlying, date range, ablation JSON path, optional series/trades paths, models dir). Pages: Performance Overview, Exposure Monitor, Signal Inspector, Trade Log, Ablation Comparison, Event Case Studies.
+Set `DASHBOARD_STATIC_DIR=web/out` if needed (default when running from project root). The API serves the built Next.js export from that directory.
+
+**Optional — Streamlit (legacy):** For a quick local UI without building the frontend: `streamlit run src/dashboard/app.py`
+
+### Running the dashboard in Docker
+
+The Docker image builds the Next.js frontend and runs the **FastAPI** app (no Streamlit). The pipeline runs **separately** (e.g. daily via Cloud Run Job or cron). After the pipeline, run `scripts/write_dashboard_snapshot.py` so the web dashboard has precomputed performance and trade-impact data.
+
+**Build and run:**
+
+```bash
+docker build -t options-agent-web .
+docker run -p 8080:8080 -e DATABASE_URL=postgresql://user:pass@host:5432/dbname options-agent-web
+# Dashboard: http://localhost:8080
+```
+
+**Local dev with Postgres:** Use `docker compose` (see `docker-compose.yml`). Update the compose file to use the new image and port 8080 if needed.
+
+**Hosting on a website and automating daily updates:** To have the dashboard always available at a URL and the pipeline run every day without manual steps, use **GCP** (recommended) or another cloud:
+
+- **GCP (recommended):** Deploy the web app as a **Cloud Run** service (always-on URL) and run the pipeline + **dashboard snapshot** as a **Cloud Run Job** triggered by **Cloud Scheduler**. Use **Cloud SQL** for PostgreSQL. Step-by-step: **[docs/deploy-gcp.md](docs/deploy-gcp.md)**. Add `DATABASE_URL` and API keys to Secret Manager (or `.env` for local).
+- **Alternatives:** [Render](https://render.com) (Web Service + Cron Job), **Railway**, or **Fly.io** (Web Service + Cron Job for pipeline and snapshot).
+- **Host cron:**  
+  `30 17 * * 1-5 cd /path/to/Sentiment_Bot && .venv/bin/python scripts/run_full_pipeline.py --steps 2,3,5,6,7,8,9,10 && .venv/bin/python scripts/write_dashboard_snapshot.py >> pipeline_cron.log 2>&1`
+
+The dashboard reads from PostgreSQL and from `dashboard_*` snapshot tables; run the pipeline and snapshot script on a schedule so the site shows fresh data.
 
 ---
 
@@ -242,7 +275,9 @@ Tests cover connectors, DB writer, feature builders, align, options env, baselin
 | **migrations/** | SQL migrations for PM, equity_bars, options_snapshots, options_features, sentiment_docs, sentiment_scored, sentiment_features, feature_bars. |
 | **src/agents/** | **baselines.py** — BuyAndHold, FixedLongVol, SimpleEventRule, DeltaNeutral, RandomPolicy. **eval.py** — evaluate_policy, compute_metrics, regime_split, bootstrap_sharpe, walk_forward_evaluate. **train_sb3.py** — train_agent (PPO/SAC), split_bars_by_time, DiscreteToBoxWrapper. **ablation.py** — run_ablation, save_ablation_results, SB3PolicyAdapter. **analysis.py** — load_ablation_results, format_ablation_table, format_regime_table, plot_*, generate_event_case_study. **obs_mask_wrapper.py** — ObsMaskWrapper and variant masks for ablation. |
 | **src/connectors/** | Polymarket (Gamma, CLOB), Kalshi API, market data (Polygon, yfinance, Tradier), sentiment (NewsAPI, Reddit). |
-| **src/dashboard/** | **app.py** — Streamlit app (performance, exposure, signal inspector, trade log, ablation, case studies). |
+| **src/api/** | **main.py** — FastAPI app (Overview, Signals, Performance, Trade Impact JSON API; serves built web dashboard). |
+| **src/dashboard/** | **app.py** — Streamlit app (legacy local UI). |
+| **web/** | Next.js frontend (Overview, Market Signals, Performance, Trade Impact); build output in `web/out`. |
 | **src/db.py** | PostgreSQL connection and apply_migrations. |
 | **src/envs/** | **options_env.py** — OptionsEnv (Gymnasium), load_feature_bars_from_db. **portfolio_constructor.py** — build_target_positions (vega/delta → legs). **execution_sim.py** — ExecutionSimulator. **reward.py**, **constraints.py** — reward and risk logic. |
 | **src/features/** | **align.py** — build_row, run_build_feature_matrix (master feature_bars). **pm_feature_builder.py** — PM features from pm_prices. **options_features.py** — ATM IV, skew, realized vol from snapshots. **sentiment_features.py** — 15-min sentiment bars. |

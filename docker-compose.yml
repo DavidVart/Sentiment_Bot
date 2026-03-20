@@ -1,0 +1,41 @@
+# Local dev: web dashboard (FastAPI + Next.js) + Postgres. Pipeline runs on host (e.g. cron) or separately.
+# Usage: docker compose up -d
+# Dashboard: http://localhost:8080
+# Set DATABASE_URL in .env to postgresql://user:pass@db:5432/ai_options_agent
+
+services:
+  dashboard:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_options_agent
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ai_options_agent
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata: {}

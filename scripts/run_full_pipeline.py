@@ -37,7 +37,7 @@ STEPS = [
     (9, "build_sentiment_features", "Build sentiment features"),
     (10, "build_feature_matrix", "Build feature matrix"),
     (11, "run_baselines", "Run baselines evaluation"),
-    (12, "run_ablation_smoke", "Run short ablation (1 seed, 1000 steps, PPO only)"),
+    (12, "run_ablation_smoke", "Run ablation (3 seeds, 50k steps, PPO)"),
     (13, "generate_reports", "Generate reports"),
 ]
 
@@ -193,8 +193,8 @@ def step_12_run_ablation_smoke() -> dict:
     out = run_ablation(
         feature_bars=feature_bars,
         algorithms=("ppo",),
-        seeds=[0],
-        total_timesteps=1000,
+        seeds=[0, 1, 2],
+        total_timesteps=50_000,
         models_dir=Path("models"),
         train_pct=0.70,
         val_pct=0.15,
@@ -271,6 +271,7 @@ def main() -> None:
     )
     parser.add_argument("--equity-years", type=int, default=2, help="Years for equity backfill (step 2)")
     parser.add_argument("--sentiment-days", type=int, default=7, help="Days for sentiment backfill (step 5)")
+    parser.add_argument("--task-run-id", type=int, default=None, help="Task run ID for progress tracking")
     args = parser.parse_args()
 
     step_nums = list(range(1, 14))

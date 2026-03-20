@@ -155,7 +155,10 @@ def run_backfill(
     clob_base = (cfg.get("polymarket") or {}).get("clob_base_url", "https://clob.polymarket.com")
     kalshi_base = (cfg.get("kalshi") or {}).get("base_url", "https://trading-api.kalshi.com")
     if polymarket:
-        backfill_polymarket(gamma_base, clob_base, closed=True, max_events=max_events_per_platform, days_history=days_history)
+        try:
+            backfill_polymarket(gamma_base, clob_base, closed=True, max_events=max_events_per_platform, days_history=days_history)
+        except Exception as e:
+            logger.warning("Polymarket backfill skipped: %s", e)
     if kalshi:
         try:
             backfill_kalshi(kalshi_base, status="closed", max_events=max_events_per_platform, days_history=days_history)

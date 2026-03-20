@@ -1,0 +1,28 @@
+# Dependencies and local state
+.venv
+venv
+env
+.env
+*.pyc
+__pycache__
+.git
+.gitignore
+*.log
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+dist
+build
+
+# Optional: keep repo smaller (include models/*.zip for dashboard snapshot job)
+*.zip
+!models/*.zip
+reports
+ablation_results.json
+ablation_results.csv
+pipeline_baselines.json
+pipeline_runs.log
+web/node_modules
+web/out
+web/.next

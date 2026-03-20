@@ -1,7 +1,8 @@
 # Hard risk limits; breach → flatten + terminate (kill switch)
+# Relaxed so agents can explore trading strategies with base_lots=5
 risk:
-  max_premium_at_risk: 50000.0
-  max_vega: 200.0
-  max_delta: 500.0
-  max_open_contracts: 100
-  max_daily_loss: 5000.0
+  max_premium_at_risk: 80000.0    # was 50k; allows larger positions
+  max_vega: 500.0                 # was 200; more room with base_lots=5
+  max_delta: 1000.0               # was 500; more room with base_lots=5
+  max_open_contracts: 200         # was 100; allows more simultaneous strategies
+  max_daily_loss: 8000.0          # was 5000; more room to learn

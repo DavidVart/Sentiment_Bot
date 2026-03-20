@@ -43,6 +43,9 @@ def _run_one(
     models_dir: Path,
     train_pct: float = 0.70,
     val_pct: float = 0.15,
+    task_run_id: int | None = None,
+    run_index: int = 0,
+    total_runs: int = 1,
 ) -> dict[str, Any]:
     """Train one model and evaluate on val+test; return metrics dict."""
     train_bars, val_bars, test_bars = split_bars_by_time(feature_bars, train_pct, val_pct)
@@ -52,7 +55,22 @@ def _run_one(
     train_env = OptionsEnv(feature_bars=train_bars)
     train_env = ObsMaskWrapper(train_env, variant=variant)
     log_dir = models_dir / "logs" if models_dir else None
-    model = train_agent(algorithm, train_env, total_timesteps=total_timesteps, seed=seed, log_dir=log_dir)
+
+    # Create progress callback if tracking is enabled
+    cb = None
+    if task_run_id is not None:
+        from src.agents.progress_callback import TrainingProgressCallback
+        cb = TrainingProgressCallback(
+            task_run_id=task_run_id,
+            total_timesteps=total_timesteps,
+            variant=variant,
+            algorithm=algorithm,
+            seed=seed,
+            run_index=run_index,
+            total_runs=total_runs,
+        )
+
+    model = train_agent(algorithm, train_env, total_timesteps=total_timesteps, seed=seed, log_dir=log_dir, callback=cb)
     save_path = models_dir / f"ablation_{variant}_{algorithm}_seed{seed}.zip" if models_dir else None
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
@@ -111,15 +129,22 @@ def run_ablation(
     models_dir: str | Path | None = None,
     train_pct: float = 0.70,
     val_pct: float = 0.15,
+    task_run_id: int | None = None,
 ) -> dict[str, Any]:
     """
     Run ablation: for each variant × algorithm × seed, train and evaluate.
     Returns aggregated results plus p-values vs variant A.
+    When task_run_id is provided, progress is written to the task_runs DB table.
     """
     if seeds is None:
         seeds = [0, 1, 2, 3, 4]
     models_dir = Path(models_dir) if models_dir else Path("models")
     models_dir.mkdir(parents=True, exist_ok=True)
+
+    # Compute total runs for progress tracking
+    valid_algos = [a.lower() for a in algorithms if a.lower() in ALGORITHMS]
+    total_runs = len(VARIANTS) * len(valid_algos) * len(seeds)
+    run_index = 0
 
     results: list[dict[str, Any]] = []
     for variant in VARIANTS:
@@ -136,8 +161,12 @@ def run_ablation(
                     models_dir=models_dir,
                     train_pct=train_pct,
                     val_pct=val_pct,
+                    task_run_id=task_run_id,
+                    run_index=run_index,
+                    total_runs=total_runs,
                 )
                 results.append(row)
+                run_index += 1
 
     # Aggregate mean ± std per (variant, algorithm)
     agg = []

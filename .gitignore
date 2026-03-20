@@ -3,6 +3,15 @@
 .env.local
 .env.*.local
 *.pem
+hetzner_key
+hetzner_key.pub
+
+# Claude Code / Cursor IDE
+.claude/
+.cursor/
+
+# Streamlit (legacy, replaced by Next.js UI)
+.streamlit/
 
 # Python
 __pycache__/
@@ -17,6 +26,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!web/lib/
 lib64/
 parts/
 sdist/
@@ -62,8 +72,9 @@ dmypy.json
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Project outputs
+# Project outputs (keep models/.gitkeep so image build has models/ dir)
 models/
+!models/.gitkeep
 *.zip
 reports/
 ablation_results.json
@@ -73,6 +84,12 @@ pipeline_baselines.json
 *.png
 *.pdf
 
+# Node / Next.js
+node_modules/
+.next/
+web/.next/
+web/node_modules/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -80,6 +97,3 @@ Thumbs.db
 # Logs
 *.log
 logs/
-
-# Optional: keep example outputs if you want to track them
-# !reports/example/

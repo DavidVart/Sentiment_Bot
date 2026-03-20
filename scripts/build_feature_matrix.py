@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import sys
 from datetime import date
+from pathlib import Path
 
-sys.path.insert(0, str(__file__.resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.features.align import run_build_feature_matrix
 from src.utils.logging_utils import get_logger

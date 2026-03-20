@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
 from src.agents.analysis import (
     format_ablation_table,
     format_regime_table,
@@ -216,6 +219,7 @@ if __name__ == "__main__":
     p.add_argument("--models-dir", default="models", help="Directory with saved ablation models")
     p.add_argument("--underlying", default="SPY")
     p.add_argument("--limit", type=int, default=2000, dest="limit_bars")
+    p.add_argument("--task-run-id", type=int, default=None, help="Task run ID for progress tracking")
     args = p.parse_args()
     main(
         ablation_json=args.ablation_json,

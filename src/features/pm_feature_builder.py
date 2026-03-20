@@ -28,8 +28,15 @@ def run_build_pm_features(token_id: str | None = None, schema_version: int = 1) 
             if token_id:
                 cur.execute("SELECT DISTINCT token_id FROM pm_prices WHERE token_id = %s", (token_id,))
             else:
-                cur.execute("SELECT DISTINCT token_id FROM pm_prices ORDER BY token_id")
+                # Only process tokens that have new prices not yet in pm_features
+                cur.execute(
+                    "SELECT DISTINCT p.token_id FROM pm_prices p "
+                    "LEFT JOIN pm_features f ON p.token_id = f.token_id AND p.ts = f.ts "
+                    "WHERE f.token_id IS NULL "
+                    "ORDER BY p.token_id"
+                )
             token_ids = [row[0] for row in cur.fetchall()]
+    logger.info("Found %d token_ids with unprocessed prices", len(token_ids))
     for tid in token_ids:
         _build_for_token(tid, schema_version)
 

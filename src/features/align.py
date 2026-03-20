@@ -191,44 +191,49 @@ def _pm_for_bar(
         "vol_of_p": [], "time_to_event": [], "surprise_z": [],
     }
     any_gap = False
+    # Batch query: get latest pm_features per token_id in a single DB roundtrip
     with conn.cursor() as cur:
-        for tid in token_ids:
-            cur.execute(
-                """
-                SELECT ts, p, logit_p, delta_p_1h, delta_p_1d, momentum, vol_of_p, time_to_event, surprise_z
-                FROM pm_features
-                WHERE token_id = %s AND ts <= %s
-                ORDER BY ts DESC
-                LIMIT 1
-                """,
-                (tid, bar_ts),
-            )
-            row = cur.fetchone()
-            if not row or len(row) < 9:
-                any_gap = True
-                continue
-            ts, p, logit_p, d1h, d1d, mom, vol, tte, sz = row
-            ts_dt = ts if isinstance(ts, datetime) else datetime.fromtimestamp(float(ts), tz=timezone.utc)
-            if getattr(ts_dt, "tzinfo", None) is None:
-                ts_dt = ts_dt.replace(tzinfo=timezone.utc)
-            bar_dt = bar_ts if bar_ts.tzinfo else bar_ts.replace(tzinfo=timezone.utc)
-            delta_sec = (bar_dt - ts_dt).total_seconds()
-            if delta_sec > gap_sec:
-                any_gap = True
-            out["p"].append(float(p))
-            out["logit_p"].append(float(logit_p))
-            if d1h is not None:
-                out["delta_p_1h"].append(float(d1h))
-            if d1d is not None:
-                out["delta_p_1d"].append(float(d1d))
-            if mom is not None:
-                out["momentum"].append(float(mom))
-            if vol is not None:
-                out["vol_of_p"].append(float(vol))
-            if tte is not None:
-                out["time_to_event"].append(float(tte))
-            if sz is not None:
-                out["surprise_z"].append(float(sz))
+        placeholders = ",".join(["%s"] * len(token_ids))
+        cur.execute(
+            f"""
+            SELECT DISTINCT ON (token_id)
+                token_id, ts, p, logit_p, delta_p_1h, delta_p_1d, momentum, vol_of_p, time_to_event, surprise_z
+            FROM pm_features
+            WHERE token_id IN ({placeholders}) AND ts <= %s
+            ORDER BY token_id, ts DESC
+            """,
+            (*token_ids, bar_ts),
+        )
+        rows = cur.fetchall()
+    found_tids = set()
+    bar_dt = bar_ts if bar_ts.tzinfo else bar_ts.replace(tzinfo=timezone.utc)
+    for row in rows:
+        if not row or len(row) < 10:
+            continue
+        tid_r, ts, p, logit_p, d1h, d1d, mom, vol, tte, sz = row
+        found_tids.add(str(tid_r))
+        ts_dt = ts if isinstance(ts, datetime) else datetime.fromtimestamp(float(ts), tz=timezone.utc)
+        if getattr(ts_dt, "tzinfo", None) is None:
+            ts_dt = ts_dt.replace(tzinfo=timezone.utc)
+        delta_sec = (bar_dt - ts_dt).total_seconds()
+        if delta_sec > gap_sec:
+            any_gap = True
+        out["p"].append(float(p))
+        out["logit_p"].append(float(logit_p))
+        if d1h is not None:
+            out["delta_p_1h"].append(float(d1h))
+        if d1d is not None:
+            out["delta_p_1d"].append(float(d1d))
+        if mom is not None:
+            out["momentum"].append(float(mom))
+        if vol is not None:
+            out["vol_of_p"].append(float(vol))
+        if tte is not None:
+            out["time_to_event"].append(float(tte))
+        if sz is not None:
+            out["surprise_z"].append(float(sz))
+    if len(found_tids) < len(token_ids):
+        any_gap = True
     agg = {}
     for k, v in out.items():
         if v:
@@ -388,10 +393,12 @@ def run_build_feature_matrix(
     if not all_bars:
         return
 
-    rows: list[FeatureRow] = []
-    with get_connection() as conn:
-        for u in underlyings:
-            token_ids = underlying_to_tokens.get(u, [])
+    total_written = 0
+    for u in underlyings:
+        token_ids = underlying_to_tokens.get(u, [])
+        rows: list[FeatureRow] = []
+        # Use a fresh connection per underlying to avoid Cloud SQL timeouts
+        with get_connection() as conn:
             for bar_ts in all_bars:
                 try:
                     rows.append(build_row(conn, u, bar_ts, token_ids, schema_version))
@@ -401,7 +408,10 @@ def run_build_feature_matrix(
                         f"tuple index out of range for underlying={u!r} bar_ts={bar_ts!r}. "
                         f"Original: {e}. Traceback:\n{traceback.format_exc()}"
                     ) from e
-        if rows:
-            from src.ingestion.pm_writer import write_feature_bars
-            write_feature_bars(conn, rows, schema_version=schema_version)
-            logger.info("Built %s feature_bars (schema_version=%s)", len(rows), schema_version)
+            if rows:
+                from src.ingestion.pm_writer import write_feature_bars
+                write_feature_bars(conn, rows, schema_version=schema_version)
+                total_written += len(rows)
+                logger.info("Built %s feature_bars for %s (schema_version=%s)", len(rows), u, schema_version)
+    if total_written:
+        logger.info("Built %s total feature_bars (schema_version=%s)", total_written, schema_version)

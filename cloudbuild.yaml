@@ -1,0 +1,11 @@
+# Faster Cloud Build: 8 vCPUs and 40 min timeout.
+# Image tag is passed by deploy-gcp.sh via --substitutions=_IMAGE_TAG=...
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_IMAGE_TAG}', '.']
+images:
+  - '${_IMAGE_TAG}'
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+timeout: '2400s'  # 40 min

@@ -1,0 +1,32 @@
+# Used by gcloud builds submit so the upload matches Docker build context.
+# Without this file, gcloud uses .gitignore and excludes models/ entirely.
+# We mirror .dockerignore so models/ and models/*.zip are included.
+
+.venv
+venv
+env
+.env
+*.pyc
+__pycache__
+.git
+.gitignore
+.gcloudignore
+*.log
+.pytest_cache
+.coverage
+htmlcov
+*.egg-info
+dist
+build
+
+# Include models/*.zip for the dashboard snapshot job (do not exclude the whole models/ dir)
+*.zip
+!models/*.zip
+reports
+ablation_results.json
+ablation_results.csv
+pipeline_baselines.json
+pipeline_runs.log
+web/node_modules
+web/out
+web/.next

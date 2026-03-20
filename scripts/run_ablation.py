@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from dotenv import load_dotenv
+load_dotenv(ROOT / ".env")
+
 from src.agents.ablation import run_ablation, save_ablation_results
 from src.envs.options_env import load_feature_bars_from_db
 
@@ -24,6 +27,7 @@ def main(
     models_dir: str | Path = "models",
     out_json: str | Path = "ablation_results.json",
     out_csv: str | Path = "ablation_results.csv",
+    task_run_id: int | None = None,
 ) -> None:
     algorithms = ("ppo", "sac") if algorithm == "both" else (algorithm.lower(),)
     if algorithm != "both" and algorithm.lower() not in ("ppo", "sac"):
@@ -42,6 +46,7 @@ def main(
         models_dir=Path(models_dir),
         train_pct=0.70,
         val_pct=0.15,
+        task_run_id=task_run_id,
     )
     save_ablation_results(out, json_path=out_json, csv_path=out_csv)
     print(f"Results saved to {out_json} and {out_csv}")
@@ -61,6 +66,7 @@ if __name__ == "__main__":
     p.add_argument("--models-dir", default="models")
     p.add_argument("--out-json", default="ablation_results.json")
     p.add_argument("--out-csv", default="ablation_results.csv")
+    p.add_argument("--task-run-id", type=int, default=None, help="Task run ID for progress tracking")
     args = p.parse_args()
     main(
         algorithm=args.algorithm,
@@ -71,4 +77,5 @@ if __name__ == "__main__":
         models_dir=args.models_dir,
         out_json=args.out_json,
         out_csv=args.out_csv,
+        task_run_id=args.task_run_id,
     )
