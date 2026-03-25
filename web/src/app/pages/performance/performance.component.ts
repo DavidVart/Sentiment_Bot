@@ -1,12 +1,20 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService, PerformanceData, AblationEntry } from '../../services/api.service';
+import { ApiService, PerformanceData, AblationEntry, BaselineData } from '../../services/api.service';
 import { Chart, registerables } from 'chart.js';
 
 Chart.register(...registerables);
 
 const VARIANT_LABELS: Record<string, string> = { A: 'Base', B: '+Sentiment', C: '+PM', D: 'Full' };
+
+const BASELINE_COLORS: Record<string, { border: string; bg: string }> = {
+  'Buy & Hold':         { border: '#3b82f6', bg: 'rgba(59,130,246,0.08)' },
+  'Fixed Long-Vol':     { border: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
+  'Simple Event Rule':  { border: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+  'Delta-Neutral':      { border: '#8b5cf6', bg: 'rgba(139,92,246,0.08)' },
+  'Random Policy':      { border: '#6b7280', bg: 'rgba(107,114,128,0.08)' },
+};
 
 @Component({
   selector: 'app-performance',
@@ -34,8 +42,8 @@ const VARIANT_LABELS: Record<string, string> = { A: 'Base', B: '+Sentiment', C: 
       <div *ngIf="!loading && !error">
         <!-- Equity Curve -->
         <div *ngIf="hasEquity" class="glass-card mb-6">
-          <h3 class="section-title mb-4">Equity Curve</h3>
-          <div class="relative" style="height: 350px">
+          <h3 class="section-title mb-4">Equity Curve (All Strategies)</h3>
+          <div class="relative" style="height: 400px">
             <canvas #equityCanvas></canvas>
           </div>
         </div>
@@ -71,6 +79,35 @@ const VARIANT_LABELS: Record<string, string> = { A: 'Base', B: '+Sentiment', C: 
           </table>
         </div>
 
+        <!-- Baselines Table -->
+        <div *ngIf="baselines.length > 0" class="glass-card mb-6 overflow-x-auto">
+          <h3 class="section-title mb-4">Baseline Strategies</h3>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-gray-500 border-b border-white/[0.06]">
+                <th class="pb-3 pr-6 font-medium">Strategy</th>
+                <th class="pb-3 pr-6 font-medium">Sharpe</th>
+                <th class="pb-3 pr-6 font-medium">Sortino</th>
+                <th class="pb-3 pr-6 font-medium">Max DD</th>
+                <th class="pb-3 pr-6 font-medium">Hit Rate %</th>
+                <th class="pb-3 font-medium">Turnover</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let b of baselines" class="border-b border-white/[0.03] hover:bg-white/[0.02] transition">
+                <td class="py-3 pr-6 text-white font-medium">{{ b.name }}</td>
+                <td class="py-3 pr-6 tabular-nums" [class]="b.metrics.annualized_sharpe > 0 ? 'text-green-400' : 'text-red-400'">
+                  {{ b.metrics.annualized_sharpe?.toFixed(2) }}
+                </td>
+                <td class="py-3 pr-6 text-gray-300 tabular-nums">{{ b.metrics.sortino?.toFixed(2) }}</td>
+                <td class="py-3 pr-6 text-gray-300 tabular-nums">{{ (b.metrics.max_drawdown * 100)?.toFixed(2) }}%</td>
+                <td class="py-3 pr-6 text-gray-300 tabular-nums">{{ b.metrics.hit_rate_pct?.toFixed(1) }}</td>
+                <td class="py-3 text-gray-300 tabular-nums">{{ b.metrics.turnover_rate?.toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
         <!-- Exposure -->
         <div *ngIf="hasExposure" class="glass-card mb-6">
           <h3 class="section-title mb-4">Exposure (Variant D)</h3>
@@ -98,6 +135,7 @@ export class PerformanceComponent implements OnInit, OnDestroy {
   error: string | null = null;
   perf: PerformanceData | null = null;
   ppoAgg: AblationEntry[] = [];
+  baselines: BaselineData[] = [];
   hasEquity = false;
   hasExposure = false;
 
@@ -123,6 +161,7 @@ export class PerformanceComponent implements OnInit, OnDestroy {
         this.perf = d;
         this.hasEquity = !!(d.equity?.ts?.length);
         this.hasExposure = !!(d.exposure?.delta?.length);
+        this.baselines = d.baselines || [];
         done();
       },
       error: e => { this.error = e.message; done(); },
@@ -143,15 +182,39 @@ export class PerformanceComponent implements OnInit, OnDestroy {
     if (this.hasEquity && this.equityCanvas) {
       const eq = this.perf!.equity!;
       const labels = eq.ts.map(t => t.slice(5, 10));
+
+      // Build datasets: Variant D + all baselines
+      const datasets: any[] = [
+        {
+          label: 'Variant D (Full)',
+          data: eq.variant_d,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,0.08)',
+          fill: false,
+          pointRadius: 0,
+          borderWidth: 2.5,
+          tension: 0.3,
+        },
+      ];
+
+      for (const bl of this.baselines) {
+        const colors = BASELINE_COLORS[bl.name] || { border: '#9ca3af', bg: 'rgba(156,163,175,0.08)' };
+        datasets.push({
+          label: bl.name,
+          data: bl.equity_series,
+          borderColor: colors.border,
+          backgroundColor: colors.bg,
+          fill: false,
+          pointRadius: 0,
+          borderWidth: 1.5,
+          tension: 0.3,
+          borderDash: bl.name === 'Random Policy' ? [4, 4] : [],
+        });
+      }
+
       this.charts.push(new Chart(this.equityCanvas.nativeElement, {
         type: 'line',
-        data: {
-          labels,
-          datasets: [
-            { label: 'Buy & Hold', data: eq.buy_and_hold, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 },
-            { label: 'Variant D (Full)', data: eq.variant_d, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 },
-          ],
-        },
+        data: { labels, datasets },
         options: this.lineOpts(),
       }));
     }

@@ -213,14 +213,14 @@ def api_performance(
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT ts_index, equity_bh, equity_d, metrics_bh, metrics_d, exposure_delta, exposure_vega FROM dashboard_evaluation WHERE underlying = %s",
+                    "SELECT ts_index, equity_bh, equity_d, metrics_bh, metrics_d, exposure_delta, exposure_vega, baselines_json FROM dashboard_evaluation WHERE underlying = %s",
                     (underlying,),
                 )
                 row = cur.fetchone()
         if not row:
-            return {"equity": None, "ablation": None, "exposure": None}
+            return {"equity": None, "ablation": None, "exposure": None, "baselines": None}
 
-        ts_index, equity_bh, equity_d, metrics_bh, metrics_d, exposure_delta, exposure_vega = row
+        ts_index, equity_bh, equity_d, metrics_bh, metrics_d, exposure_delta, exposure_vega, baselines_json = row
         equity = {
             "ts": ts_index or [],
             "buy_and_hold": equity_bh or [],
@@ -241,7 +241,14 @@ def api_performance(
                         ablation = r[0]
         except Exception:
             pass
-        return {"equity": equity, "metrics_bh": metrics_bh, "metrics_d": metrics_d, "ablation": ablation, "exposure": exposure}
+        return {
+            "equity": equity,
+            "metrics_bh": metrics_bh,
+            "metrics_d": metrics_d,
+            "ablation": ablation,
+            "exposure": exposure,
+            "baselines": baselines_json or [],
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -536,11 +543,78 @@ def api_ablation():
         from src.db import get_connection
         with get_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT aggregated_json FROM dashboard_ablation WHERE id = 1")
+                cur.execute("SELECT aggregated_json, walk_forward_json FROM dashboard_ablation WHERE id = 1")
                 row = cur.fetchone()
         if not row or not row[0]:
-            return {"aggregated": []}
-        return {"aggregated": row[0]}
+            return {"aggregated": [], "walk_forward": None}
+        return {
+            "aggregated": row[0],
+            "walk_forward": row[1] if len(row) > 1 else None,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/walk-forward")
+def api_walk_forward():
+    """Walk-forward per-fold results for detailed analysis."""
+    try:
+        from src.db import get_connection
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT DISTINCT run_label FROM walk_forward_aggregated ORDER BY run_label DESC LIMIT 1"
+                )
+                label_row = cur.fetchone()
+                if not label_row:
+                    return {"run_label": None, "aggregated": [], "per_fold": []}
+                run_label = label_row[0]
+
+                cur.execute(
+                    """SELECT variant, algorithm, n_folds, n_seeds,
+                              sharpe_mean, sharpe_std, max_drawdown_mean, max_drawdown_std,
+                              hit_rate_mean, hit_rate_std, turnover_mean, turnover_std, config_json
+                       FROM walk_forward_aggregated WHERE run_label = %s""",
+                    (run_label,),
+                )
+                agg_rows = cur.fetchall()
+                aggregated = [
+                    {
+                        "variant": r[0], "algorithm": r[1], "n_folds": r[2], "n_seeds": r[3],
+                        "sharpe_mean": r[4], "sharpe_std": r[5],
+                        "max_drawdown_mean": r[6], "max_drawdown_std": r[7],
+                        "hit_rate_mean": r[8], "hit_rate_std": r[9],
+                        "turnover_mean": r[10], "turnover_std": r[11],
+                        "config": r[12],
+                    }
+                    for r in agg_rows
+                ]
+
+                cur.execute(
+                    """SELECT variant, algorithm, seed, fold,
+                              eval_start_idx, eval_end_idx, sharpe, max_drawdown,
+                              hit_rate, turnover, total_pnl, n_bars
+                       FROM walk_forward_results WHERE run_label = %s
+                       ORDER BY fold, variant, algorithm, seed""",
+                    (run_label,),
+                )
+                fold_rows = cur.fetchall()
+                per_fold = [
+                    {
+                        "variant": r[0], "algorithm": r[1], "seed": r[2], "fold": r[3],
+                        "eval_start_idx": r[4], "eval_end_idx": r[5],
+                        "sharpe": r[6], "max_drawdown": r[7],
+                        "hit_rate": r[8], "turnover": r[9],
+                        "total_pnl": r[10], "n_bars": r[11],
+                    }
+                    for r in fold_rows
+                ]
+
+                return {
+                    "run_label": run_label,
+                    "aggregated": aggregated,
+                    "per_fold": per_fold,
+                }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

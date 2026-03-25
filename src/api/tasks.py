@@ -141,6 +141,12 @@ def _build_command(task_type: str, config: dict[str, Any], task_id: int) -> list
             cmd += ["--out-json", str(config["out_json"])]
         if config.get("out_csv"):
             cmd += ["--out-csv", str(config["out_csv"])]
+        if config.get("walk_forward"):
+            cmd += ["--walk-forward"]
+            if config.get("train_days"):
+                cmd += ["--train-days", str(config["train_days"])]
+            if config.get("eval_days"):
+                cmd += ["--eval-days", str(config["eval_days"])]
         return cmd
 
     elif task_type == "pipeline":

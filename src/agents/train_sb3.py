@@ -44,6 +44,51 @@ def split_bars_by_time(
     return train, val, test
 
 
+BARS_PER_DAY = 27  # 15-min bars 9:30-16:00
+
+
+def split_bars_walk_forward(
+    feature_bars: list[dict[str, Any]],
+    train_days: int = 20,
+    eval_days: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Generate walk-forward folds from feature_bars.
+
+    Defaults: train_days=20, eval_days=5.
+    Adjusted for real-time collection period; scales to 60/15 with longer data windows.
+
+    Each fold: train on [start .. start + train_bars), evaluate on [start + train_bars .. start + train_bars + eval_bars).
+    The window rolls forward by eval_bars after each fold.
+
+    Returns list of fold dicts: {"fold": int, "train_bars": list, "eval_bars": list,
+                                  "train_range": (start_idx, end_idx), "eval_range": (start_idx, end_idx)}
+    """
+    train_bars_n = train_days * BARS_PER_DAY
+    eval_bars_n = eval_days * BARS_PER_DAY
+    n = len(feature_bars)
+
+    folds: list[dict[str, Any]] = []
+    fold_idx = 0
+    start = 0
+
+    while start + train_bars_n + eval_bars_n <= n:
+        train_end = start + train_bars_n
+        eval_end = train_end + eval_bars_n
+
+        folds.append({
+            "fold": fold_idx,
+            "train_bars": feature_bars[start:train_end],
+            "eval_bars": feature_bars[train_end:eval_end],
+            "train_range": (start, train_end),
+            "eval_range": (train_end, eval_end),
+        })
+        fold_idx += 1
+        start += eval_bars_n  # roll forward by one eval window
+
+    return folds
+
+
 class DiscreteToBoxWrapper(Env):
     """Wraps an env with MultiDiscrete([3,3,3,3]) so action space is Box(0, 2, (4,)) for SAC."""
 

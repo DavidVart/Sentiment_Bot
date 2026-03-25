@@ -56,6 +56,12 @@ export interface OverviewData {
   sentiment_summary: string | null;
 }
 
+export interface BaselineData {
+  name: string;
+  equity_series: number[];
+  metrics: Record<string, number>;
+}
+
 export interface PerformanceData {
   equity: {
     ts: string[];
@@ -66,6 +72,7 @@ export interface PerformanceData {
     delta: number[];
     vega: number[];
   } | null;
+  baselines: BaselineData[] | null;
 }
 
 export interface AblationEntry {

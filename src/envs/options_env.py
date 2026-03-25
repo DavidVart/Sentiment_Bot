@@ -487,10 +487,26 @@ class OptionsEnv(Env[np.ndarray, np.ndarray]):
         obs = self._get_obs()
         return obs, {"bar_idx": 0}
 
+    def _extract_pm_events(self, row: dict[str, Any]) -> list[dict[str, Any]]:
+        """Extract PM event data from a feature_bars row into the format _row_to_obs expects."""
+        pm_fields = ["p", "logit_p", "delta_p_1h", "delta_p_1d",
+                      "momentum", "vol_of_p", "time_to_event", "surprise_z"]
+        event: dict[str, Any] = {}
+        for field in pm_fields:
+            val = row.get(f"pm_{field}")
+            if val is not None and not (isinstance(val, float) and math.isnan(val)):
+                event[field] = float(val)
+        # We have one PM event per row; duplicate to fill MAX_PM_EVENTS slots
+        if event:
+            return [event] + [{}] * (MAX_PM_EVENTS - 1)
+        return [{}] * MAX_PM_EVENTS
+
     def _get_obs(self) -> np.ndarray:
         row = self._current_row()
         nd, ng, nv, nt = self._portfolio_greeks()
         pos_count = sum(1 for q in self._positions.values() if q != 0)
+        # Update PM events from current row's prediction market data
+        self._pm_events = self._extract_pm_events(row)
         return _row_to_obs(
             row,
             self._cash,

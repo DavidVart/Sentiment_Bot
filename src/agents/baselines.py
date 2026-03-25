@@ -18,31 +18,33 @@ class Policy(Protocol):
 
 
 class BuyAndHold:
-    """No options trading; action = flat (vega=0, delta=0). Track underlying returns separately in eval."""
+    """Synthetic long SPY via bull call spread (0 vega, +delta). Holds steady position each bar."""
 
     def select_action(self, observation: np.ndarray) -> np.ndarray:
-        return np.array([1, 1, 0, 0], dtype=np.int64)  # vega=0, delta=0, size=0.25, expiry=7D
+        return np.array([1, 2, 0, 1], dtype=np.int64)  # vega=0, delta=+1, size=0.25, expiry=14D
 
 
 class FixedLongVol:
-    """Every bar: buy ATM straddle 30D (vega=+1, delta=0, size=1.0, expiry=30D). Roll at expiry handled by re-entering."""
+    """Every bar: buy ATM straddle 30D (vega=+1, delta=0, size=0.5, expiry=30D). Sized to stay within vega limits."""
 
     def select_action(self, observation: np.ndarray) -> np.ndarray:
-        return np.array([2, 1, 2, 2], dtype=np.int64)  # vega=+1, delta=0, size=1.0, expiry=30D
+        return np.array([2, 1, 1, 2], dtype=np.int64)  # vega=+1, delta=0, size=0.5, expiry=30D
 
 
 class SimpleEventRule:
-    """If any PM delta_p_1h > threshold (in obs space), buy straddle; else flat. Default threshold 0.05 (obs normalized)."""
+    """If any PM delta_p_1h > threshold (in obs space), buy straddle; else flat.
+    Default threshold 0.01 (raw delta ~0.002 after z-clip with scale 0.2).
+    Uses abs() to catch both positive and negative moves."""
 
-    def __init__(self, delta_p_1h_threshold: float = 0.05):
+    def __init__(self, delta_p_1h_threshold: float = 0.01):
         self.threshold = delta_p_1h_threshold
 
     def select_action(self, observation: np.ndarray) -> np.ndarray:
         obs = np.asarray(observation).flatten()
         if len(obs) <= OBS_PM_DELTA_1H_1:
             return np.array([1, 1, 0, 0], dtype=np.int64)
-        if obs[OBS_PM_DELTA_1H_0] > self.threshold or obs[OBS_PM_DELTA_1H_1] > self.threshold:
-            return np.array([2, 1, 2, 1], dtype=np.int64)  # straddle, 1.0 size, 14D
+        if abs(obs[OBS_PM_DELTA_1H_0]) > self.threshold or abs(obs[OBS_PM_DELTA_1H_1]) > self.threshold:
+            return np.array([2, 1, 1, 1], dtype=np.int64)  # straddle, 0.5 size, 14D
         return np.array([1, 1, 0, 0], dtype=np.int64)
 
 
