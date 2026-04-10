@@ -298,4 +298,4 @@ Tests cover connectors, DB writer, feature builders, align, options env, baselin
 
 ## 11. License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT License. See [LICENSE](LICENSE) for full text.
