@@ -41,8 +41,8 @@ def test_kalshi_candlestick_parsing():
     client = KalshiClient()
     raw = {
         "candlesticks": [
-            {"end_ts": 1700000000, "yes_price": 0.35},
-            {"end_ts": 1700003600, "yes_price": 0.38},
+            {"end_period_ts": 1700000000, "price": {"close": 0.35}},
+            {"end_period_ts": 1700003600, "price": {"close": 0.38}},
         ]
     }
 

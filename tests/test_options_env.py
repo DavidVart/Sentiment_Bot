@@ -102,7 +102,8 @@ def test_episode_terminates_on_drawdown_breach():
 def test_reward_compute():
     r, peak, term = compute_reward(100.0, 10.0, 1000.0, 1000.0, 1100.0, 1.0, 2.0)
     assert peak == 1100.0
-    assert r == pytest.approx(100.0 - 10.0 - 0.0)
+    # pnl_pct=10.0, fee_pct=1.0, dd_pct=0, inaction_penalty=0.02 (no positions)
+    assert r == pytest.approx(10.0 - 1.0 - 0.02)
 
 
 def test_constraints_breach():

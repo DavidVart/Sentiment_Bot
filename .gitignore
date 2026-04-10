@@ -10,7 +10,7 @@ hetzner_key.pub
 .claude/
 .cursor/
 
-# Streamlit (legacy, replaced by Next.js UI)
+# Streamlit (legacy, replaced by Angular dashboard)
 .streamlit/
 
 # Python
@@ -84,10 +84,9 @@ pipeline_baselines.json
 *.png
 *.pdf
 
-# Node / Next.js
+# Node / Angular
 node_modules/
-.next/
-web/.next/
+web/.angular/
 web/node_modules/
 
 # OS

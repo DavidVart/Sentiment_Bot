@@ -1,4 +1,4 @@
-# Multi-stage: build web dashboard (Next.js) then serve via FastAPI.
+# Multi-stage: build web dashboard (Angular) then serve via FastAPI.
 # Cloud Run: set PORT=8080, DATABASE_URL and API keys via env or Secret Manager.
 
 # Stage 1: build frontend
@@ -28,7 +28,7 @@ COPY models/ ./models/
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir -e .
 
-COPY --from=frontend /app/web/out /app/static
+COPY --from=frontend /app/web/out/browser /app/static
 
 ENV DASHBOARD_STATIC_DIR=/app/static
 ENV PORT=8080

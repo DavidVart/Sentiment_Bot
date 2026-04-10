@@ -102,8 +102,8 @@ class ClobClient:
                 if p is None:
                     continue
                 if isinstance(t, int):
-                    # API returns t in seconds (per Polymarket docs)
-                    ts = datetime.fromtimestamp(t if t < 2e12 else t / 1000.0, tz=timezone.utc)
+                    # API may return seconds or milliseconds
+                    ts = datetime.fromtimestamp(t if t < 1e12 else t / 1000.0, tz=timezone.utc)
                 elif isinstance(t, str):
                     from dateutil import parser as date_parser
                     ts = date_parser.isoparse(t.replace("Z", "+00:00"))

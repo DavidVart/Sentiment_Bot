@@ -1,12 +1,10 @@
 # AI Options Trading Agent: Reinforcement Learning with Prediction Markets and Sentiment
 
-**Thesis-ready documentation.**
-
 ---
 
 ## 1. Project title and research question
 
-**Title:** AI Options Trading Agent — combining prediction markets, news/social sentiment, and options features for reinforcement learning–based volatility and delta management.
+**Title:** AI Options Trading Agent: combining prediction markets, news/social sentiment, and options features for reinforcement learning-based volatility and delta management.
 
 **Research question:** Can an RL agent that observes (i) options surface and underlying price features, (ii) news and social sentiment, and (iii) prediction-market probabilities improve risk-adjusted performance (e.g. Sharpe ratio, drawdown) over baseline strategies, and which observation subsets contribute most (ablation)?
 
@@ -59,7 +57,18 @@
                     +------------------+     +------------------+
 ```
 
-**Data flow (summary):** Raw data (PM, sentiment, equity, options) is ingested into PostgreSQL, then turned into per-asset/time features. The align module joins them onto a 15-min market-hours clock into `feature_bars`. The RL environment reads `feature_bars`, exposes a 52-dim observation and 4-dim discrete action; baselines and PPO/SAC agents are trained and evaluated; the evaluation harness and analysis module produce metrics, regime splits, and thesis outputs (tables, plots, case studies).
+**Data flow (summary):** Raw data (PM, sentiment, equity, options) is ingested into PostgreSQL, then turned into per-asset/time features. The align module joins them onto a 15-min market-hours clock into `feature_bars`. The RL environment reads `feature_bars`, exposes a 52-dimensional observation and a `MultiDiscrete([3,3,3,3])` action space (81 combinations across direction, strike, expiry, and size). Options are priced with Black-Scholes and the execution simulator applies bid-ask spreads (0.5-3%), per-contract fees, slippage, and a 1-bar delay. PPO/SAC agents are trained and evaluated; the evaluation harness and analysis module produce metrics, regime splits, and thesis outputs (tables, plots, case studies).
+
+### Key results (200K in-sample, PPO)
+
+| Variant | Observation dims | Sharpe ratio (mean +/- std) |
+|---------|------------------|-----------------------------|
+| A (Base) | 45 | 10.61 +/- 4.70 |
+| B (+Sentiment) | 48 | 7.67 +/- 2.33 |
+| **C (+Prediction Markets)** | **49** | **14.69 +/- 4.51** |
+| D (Full) | 52 | 10.24 +/- 1.55 |
+
+Variant C outperforms all others by 38.5% over the base case. VADER sentiment at daily frequency (Variant B) hurts performance. Walk-forward cross-validation preserves the ranking C > A > B > D. All trained agents beat the Delta-Neutral (4.25), Buy-and-Hold (-2.61), and Random Policy (-4.40) baselines.
 
 ---
 
@@ -152,10 +161,10 @@ python scripts/run_full_pipeline.py [options]
 
 **Options:**
 
-- `--dry-run` — Print which steps would run; do not execute.
-- `--steps 1,2,10` — Run only the listed step numbers (comma-separated).
-- `--equity-years 2` — Years of history for equity backfill (default 2).
-- `--sentiment-days 7` — Days of history for sentiment backfill (default 7).
+- `--dry-run`: print which steps would run; do not execute.
+- `--steps 1,2,10`: run only the listed step numbers (comma-separated).
+- `--equity-years 2`: years of history for equity backfill (default 2).
+- `--sentiment-days 7`: days of history for sentiment backfill (default 7).
 
 **Examples:**
 
@@ -190,7 +199,7 @@ python scripts/run_ablation.py --algorithm both --seeds 5 --timesteps 50000 --ou
 python scripts/run_ablation.py --algorithm ppo --seeds 1 --timesteps 1000 --out-json ablation_results.json
 ```
 
-Requires `feature_bars` in PostgreSQL (run steps 1–10 first). Models are saved under `models/` (e.g. `ablation_D_ppo_seed0.zip`). Results are written to the given JSON/CSV and include metrics and p-values vs variant A.
+Requires `feature_bars` in PostgreSQL (run steps 1-10 first). Models are saved under `models/` (e.g. `ablation_D_ppo_seed0.zip`). Results are written to the given JSON/CSV and include metrics and p-values vs variant A.
 
 ---
 
@@ -210,7 +219,7 @@ python scripts/generate_reports.py --ablation-json ablation_results.json [--outp
 
 ## 8. Dashboard
 
-**Web dashboard (primary):** FastAPI backend + Next.js frontend. Four pages: Overview, Market Signals, Performance, Trade Impact. Data is read from PostgreSQL and from precomputed snapshot tables (filled by the daily pipeline + snapshot script).
+**Web dashboard (primary):** FastAPI backend + Angular 17 frontend. Five pages: Overview, Market Signals, Performance, Trade Impact, and Tasks. Data is read from PostgreSQL and from precomputed snapshot tables (filled by the daily pipeline + snapshot script).
 
 **Run locally:**
 
@@ -220,13 +229,13 @@ uvicorn src.api.main:app --host 0.0.0.0 --port 8080
 # Open http://localhost:8080
 ```
 
-Set `DASHBOARD_STATIC_DIR=web/out` if needed (default when running from project root). The API serves the built Next.js export from that directory.
+Set `DASHBOARD_STATIC_DIR=web/out/browser` if needed (default when running from project root). The API serves the built Angular export from that directory.
 
-**Optional — Streamlit (legacy):** For a quick local UI without building the frontend: `streamlit run src/dashboard/app.py`
+**Optional, Streamlit (legacy):** For a quick local UI without building the frontend: `streamlit run src/dashboard/app.py`
 
 ### Running the dashboard in Docker
 
-The Docker image builds the Next.js frontend and runs the **FastAPI** app (no Streamlit). The pipeline runs **separately** (e.g. daily via Cloud Run Job or cron). After the pipeline, run `scripts/write_dashboard_snapshot.py` so the web dashboard has precomputed performance and trade-impact data.
+The Docker image builds the Angular frontend and runs the **FastAPI** app (no Streamlit). The pipeline runs **separately** (e.g. daily via Cloud Run Job or cron). After the pipeline, run `scripts/write_dashboard_snapshot.py` so the web dashboard has precomputed performance and trade-impact data.
 
 **Build and run:**
 
@@ -273,18 +282,20 @@ Tests cover connectors, DB writer, feature builders, align, options env, baselin
 |------|-------------|
 | **configs/** | YAML: data_sources, mapping (PM → underlyings/tokens), universe (symbols). |
 | **migrations/** | SQL migrations for PM, equity_bars, options_snapshots, options_features, sentiment_docs, sentiment_scored, sentiment_features, feature_bars. |
-| **src/agents/** | **baselines.py** — BuyAndHold, FixedLongVol, SimpleEventRule, DeltaNeutral, RandomPolicy. **eval.py** — evaluate_policy, compute_metrics, regime_split, bootstrap_sharpe, walk_forward_evaluate. **train_sb3.py** — train_agent (PPO/SAC), split_bars_by_time, DiscreteToBoxWrapper. **ablation.py** — run_ablation, save_ablation_results, SB3PolicyAdapter. **analysis.py** — load_ablation_results, format_ablation_table, format_regime_table, plot_*, generate_event_case_study. **obs_mask_wrapper.py** — ObsMaskWrapper and variant masks for ablation. |
+| **src/agents/** | **baselines.py**: BuyAndHold, FixedLongVol, SimpleEventRule, DeltaNeutral, RandomPolicy. **eval.py**: evaluate_policy, compute_metrics, regime_split, bootstrap_sharpe, walk_forward_evaluate. **train_sb3.py**: train_agent (PPO/SAC), split_bars_by_time, DiscreteToBoxWrapper. **ablation.py**: run_ablation, save_ablation_results, SB3PolicyAdapter. **analysis.py**: load_ablation_results, format_ablation_table, format_regime_table, plot_*, generate_event_case_study. **obs_mask_wrapper.py**: ObsMaskWrapper and variant masks for ablation. |
 | **src/connectors/** | Polymarket (Gamma, CLOB), Kalshi API, market data (Polygon, yfinance, Tradier), sentiment (NewsAPI, Reddit). |
-| **src/api/** | **main.py** — FastAPI app (Overview, Signals, Performance, Trade Impact JSON API; serves built web dashboard). |
-| **src/dashboard/** | **app.py** — Streamlit app (legacy local UI). |
-| **web/** | Next.js frontend (Overview, Market Signals, Performance, Trade Impact); build output in `web/out`. |
+| **src/api/** | **main.py**: FastAPI app (Overview, Signals, Performance, Trade Impact, Tasks JSON API; serves built web dashboard). |
+| **src/dashboard/** | **app.py**: Streamlit app (legacy local UI). |
+| **web/** | Angular 17 frontend (Overview, Market Signals, Performance, Trade Impact, Tasks); build output in `web/out/browser`. |
 | **src/db.py** | PostgreSQL connection and apply_migrations. |
-| **src/envs/** | **options_env.py** — OptionsEnv (Gymnasium), load_feature_bars_from_db. **portfolio_constructor.py** — build_target_positions (vega/delta → legs). **execution_sim.py** — ExecutionSimulator. **reward.py**, **constraints.py** — reward and risk logic. |
-| **src/features/** | **align.py** — build_row, run_build_feature_matrix (master feature_bars). **pm_feature_builder.py** — PM features from pm_prices. **options_features.py** — ATM IV, skew, realized vol from snapshots. **sentiment_features.py** — 15-min sentiment bars. |
+| **src/envs/** | **options_env.py**: OptionsEnv (Gymnasium), load_feature_bars_from_db. **portfolio_constructor.py**: build_target_positions (vega/delta to legs). **execution_sim.py**: ExecutionSimulator. **reward.py**, **constraints.py**: reward and risk logic. |
+| **src/features/** | **align.py**: build_row, run_build_feature_matrix (master feature_bars). **pm_feature_builder.py**: PM features from pm_prices. **options_features.py**: ATM IV, skew, realized vol from snapshots. **sentiment_features.py**: 15-min sentiment bars. |
 | **src/ingestion/** | Backfill and write logic for PM, equity, options, sentiment (pm_writer, sentiment_writer, backfill_*.py). |
 | **src/utils/** | Schemas (pydantic), logging, HTTP retry. |
 | **scripts/** | CLI entrypoints: backfill, backfill_equity, backfill_options, backfill_sentiment, score_sentiment, build_pm_features, build_options_features, build_sentiment_features, build_feature_matrix, run_baselines, run_ablation, generate_reports, **run_full_pipeline.py** (end-to-end). |
 
 ---
 
-*This README is intended for thesis defense and reproducibility: it documents the research question, architecture, setup, pipeline steps, ablation, reports, dashboard, tests, and module layout.*
+## 11. License
+
+MIT License. See [LICENSE](LICENSE) for details.

@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ai-options-agent"
 version = "0.1.0"
-description = "AI Options Trading Agent — prediction markets, sentiment, RL"
+description = "AI Options Trading Agent: prediction markets, sentiment, RL"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "Developer Team" }]
+authors = [{ name = "David Vargas" }]
 dependencies = [
     "pydantic>=2.0",
     "pyyaml>=6.0",
@@ -45,14 +45,13 @@ dev = [
     "pytest-asyncio>=0.21",
     "respx>=0.20",
 ]
-# Optional: for computing Black–Scholes Greeks when provider omits them (legacy setup.py; install setuptools first if needed)
+# Optional: for computing Black-Scholes Greeks when provider omits them (legacy setup.py; install setuptools first if needed)
 greeks = [
     "py_vollib>=1.0",
 ]
 
 [project.scripts]
 backfill = "scripts.backfill:main"
-incremental_update = "scripts.incremental_update:main"
 build_pm_features = "scripts.build_pm_features:main"
 
 [tool.setuptools.packages.find]

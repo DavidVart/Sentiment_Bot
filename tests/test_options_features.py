@@ -128,7 +128,7 @@ def test_run_build_options_features_single_key():
     ]
 
     def fetchone():
-        if "SELECT close FROM equity_bars" in last_sql[0] and "ts <= " not in last_sql[0]:
+        if "SELECT close FROM equity_bars" in last_sql[0]:
             return (600.0,)
         if "SELECT 1 FROM" in last_sql[0]:
             return (1,)

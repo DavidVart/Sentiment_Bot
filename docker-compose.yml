@@ -1,7 +1,7 @@
-# Local dev: web dashboard (FastAPI + Next.js) + Postgres. Pipeline runs on host (e.g. cron) or separately.
+# Local dev: web dashboard (FastAPI + Angular) + Postgres. Pipeline runs on host (e.g. cron) or separately.
 # Usage: docker compose up -d
 # Dashboard: http://localhost:8080
-# Set DATABASE_URL in .env to postgresql://user:pass@db:5432/ai_options_agent
+# Set POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB in .env (defaults: postgres, changeme, ai_options_agent)
 
 services:
   dashboard:
@@ -10,7 +10,7 @@ services:
       - "8080:8080"
     env_file: .env
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/ai_options_agent
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-ai_options_agent}
     depends_on:
       db:
         condition: service_healthy
@@ -24,9 +24,9 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ai_options_agent
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_options_agent}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:

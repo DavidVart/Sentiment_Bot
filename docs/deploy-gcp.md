@@ -1,6 +1,6 @@
 # Hosting on Google Cloud Platform (GCP)
 
-This guide deploys the **web dashboard** (FastAPI + Next.js frontend) as a public website on Cloud Run and runs the **daily pipeline + dashboard snapshot** automatically with Cloud Run Jobs and Cloud Scheduler. No manual updates and no need to run anything on your machine.
+This guide deploys the **web dashboard** (FastAPI + Angular frontend) as a public website on Cloud Run and runs the **daily pipeline + dashboard snapshot** automatically with Cloud Run Jobs and Cloud Scheduler. No manual updates and no need to run anything on your machine.
 
 ---
 
@@ -8,16 +8,16 @@ This guide deploys the **web dashboard** (FastAPI + Next.js frontend) as a publi
 
 | Need | GCP solution |
 |------|----------------|
-| Dashboard always available at a URL | **Cloud Run** (FastAPI + static Next.js frontend) — scales to zero when idle, pay per request |
-| Daily pipeline + snapshot without manual runs | **Cloud Run Jobs** + **Cloud Scheduler** — same Docker image, job runs pipeline then `write_dashboard_snapshot.py` on a schedule (e.g. weekdays 5:30 PM) |
-| Shared database for dashboard and pipeline | **Cloud SQL (PostgreSQL)** — dashboard and job use the same `DATABASE_URL` |
+| Dashboard always available at a URL | **Cloud Run** (FastAPI + static Angular frontend): scales to zero when idle, pay per request |
+| Daily pipeline + snapshot without manual runs | **Cloud Run Jobs** + **Cloud Scheduler**: same Docker image, job runs pipeline then `write_dashboard_snapshot.py` on a schedule (e.g. weekdays 5:30 PM) |
+| Shared database for dashboard and pipeline | **Cloud SQL (PostgreSQL)**: dashboard and job use the same `DATABASE_URL` |
 | API keys and DB URL kept secret | **Secret Manager** (or env vars in Cloud Run) |
 
 **Alternatives (if you prefer):**
 
-- **Render** — Deploy the repo as a Web Service (Streamlit) + Cron Job for the pipeline. Simpler setup; fewer GCP concepts. [Render Python docs](https://render.com/docs/deploy-streamlit).
-- **Railway / Fly.io** — Similar: one app + scheduled job. Good if you want a single dashboard and don’t need GCP integration.
-- **AWS** — Use **App Runner** or **ECS** for the dashboard and **EventBridge + Lambda/Step Functions** or a scheduled **ECS task** for the pipeline. More moving parts than Cloud Run + Jobs.
+- **Render**: Deploy the repo as a Web Service (Streamlit) + Cron Job for the pipeline. Simpler setup; fewer GCP concepts. [Render Python docs](https://render.com/docs/deploy-streamlit).
+- **Railway / Fly.io**: Similar: one app + scheduled job. Good if you want a single dashboard and don’t need GCP integration.
+- **AWS**: Use **App Runner** or **ECS** for the dashboard and **EventBridge + Lambda/Step Functions** or a scheduled **ECS task** for the pipeline. More moving parts than Cloud Run + Jobs.
 
 GCP is recommended here because Cloud Run + Cloud Run Jobs use the **same image** and the same **Cloud Scheduler** pattern is straightforward and cost-effective.
 
@@ -59,7 +59,7 @@ From the project root, with your `.env` (and optionally `DB_PASSWORD` and `CREAT
 ./scripts/deploy-gcp.sh
 ```
 
-The script uses **Project ID** `sentiment-bot-487918` and **Project number** `722852346958` by default. It enables APIs, creates Artifact Registry, optionally creates Cloud SQL, builds the image with Cloud Build, creates/updates secrets from `.env`, deploys the Cloud Run service and job, and **schedules the daily pipeline automatically** (see below).
+The script reads `PROJECT_ID` and `PROJECT_NUMBER` from the environment (or `.env`). It enables APIs, creates Artifact Registry, optionally creates Cloud SQL, builds the image with Cloud Build, creates/updates secrets from `.env`, deploys the Cloud Run service and job, and **schedules the daily pipeline automatically** (see below).
 
 ### Pipeline job is automated
 
@@ -101,21 +101,21 @@ If you don’t set `MODEL_GCS_URI` and don’t have `models/ablation_D_ppo_seed0
 
 ## Step-by-step (first-time deploy)
 
-**Is `DATABASE_URL=postgresql://Jorge@localhost:5432/ai_options_agent` OK?**  
+**Is `DATABASE_URL=postgresql://user@localhost:5432/ai_options_agent` OK?**  
 No. That URL is for **local development only**. The dashboard and pipeline run **in GCP**, so they cannot reach `localhost`. You need a **cloud-accessible database** (e.g. Cloud SQL). Your `.env` can keep localhost for local runs; for deploy you either let the script create Cloud SQL or you use an existing cloud Postgres URL.
 
-### Option A — Let the script create Cloud SQL (easiest)
+### Option A: Let the script create Cloud SQL (easiest)
 
 1. **Log in and set project** (you already did this):
    ```bash
    gcloud auth login
-   gcloud config set project sentiment-bot-487918
+   gcloud config set project $PROJECT_ID
    ```
 
 2. **Run the deploy script and create the database in one go**  
    Pick a **strong password** for the new DB user (e.g. `app`). The script will create a small Cloud SQL instance, database, and user, then use that URL for the deployed app. Your `.env` is only used for API keys and (when not creating SQL) for `DATABASE_URL`; here we override with the new Cloud SQL URL.
    ```bash
-   cd /Users/Jorge/Desktop/Sentiment_Bot
+   cd /path/to/Sentiment_Bot
    CREATE_CLOUD_SQL=1 DB_PASSWORD='YourStrongPasswordHere' ./scripts/deploy-gcp.sh
    ```
    This takes several minutes the first time (APIs, Artifact Registry, Cloud SQL creation, build, deploy).
@@ -130,16 +130,16 @@ No. That URL is for **local development only**. The dashboard and pipeline run *
    ```
 
 5. **Keep using localhost locally**  
-   Leave `DATABASE_URL=postgresql://Jorge@localhost:5432/ai_options_agent` in `.env` for local development. The **deployed** app uses the Cloud SQL URL stored in Secret Manager, not your `.env`.
+   Leave `DATABASE_URL=postgresql://user@localhost:5432/ai_options_agent` in `.env` for local development. The **deployed** app uses the Cloud SQL URL stored in Secret Manager, not your `.env`.
 
-### Option B — You already have (or will create) Cloud SQL
+### Option B: You already have (or will create) Cloud SQL
 
 1. **Log in and set project** (same as above).
 
 2. **Create a Cloud SQL instance and database** (if you don’t have one), then get the **public IP** and set a **connection URL**:
    ```bash
-   gcloud config set project sentiment-bot-487918
-   # Create instance (once), then database and user — see "2. Cloud SQL" below for full commands.
+   gcloud config set project $PROJECT_ID
+   # Create instance (once), then database and user: see "2. Cloud SQL" below for full commands.
    gcloud sql instances describe options-agent-db --format='value(ipAddresses[0].ipAddress)'
    ```
    Set in your environment (or in a temporary `.env` for deploy only):
@@ -149,7 +149,7 @@ No. That URL is for **local development only**. The dashboard and pipeline run *
 
 3. **Run the deploy script** (it will push this `DATABASE_URL` to Secret Manager):
    ```bash
-   cd /Users/Jorge/Desktop/Sentiment_Bot
+   cd /path/to/Sentiment_Bot
    ./scripts/deploy-gcp.sh
    ```
    If your `.env` still has `localhost`, the script sources `.env` and may overwrite `DATABASE_URL`. So either: put the Cloud SQL URL in `.env` only for this run, or run:
@@ -324,7 +324,7 @@ done
 
 ## 5. Deploy the dashboard (Cloud Run service)
 
-Deploy the image as a **service** so the web dashboard is always reachable at a URL. The container runs FastAPI (uvicorn) on port 8080 and serves the built Next.js frontend at `/`.
+Deploy the image as a **service** so the web dashboard is always reachable at a URL. The container runs FastAPI (uvicorn) on port 8080 and serves the built Angular frontend at `/`.
 
 ```bash
 IMAGE=${REGION}-docker.pkg.dev/${PROJECT_ID}/options-agent/dashboard:latest
@@ -412,7 +412,7 @@ The Dockerfile runs `uvicorn src.api.main:app --host 0.0.0.0 --port ${PORT:-8080
 ## 9. Cost (ballpark)
 
 - **Cloud Run (dashboard):** Free tier is generous; low traffic usually stays within free tier (e.g. 2M requests/month).
-- **Cloud Run Jobs:** Billed per run time; a daily 10–20 minute pipeline is a few dollars per month.
+- **Cloud Run Jobs:** Billed per run time; a daily 10-20 minute pipeline is a few dollars per month.
 - **Cloud Scheduler:** First 3 jobs free; then about $0.10/job/month.
 - **Cloud SQL:** `db-f1-micro` is low cost but not free; check current pricing.
 - **Secret Manager:** Small number of secrets is negligible.
@@ -426,6 +426,6 @@ Overall, expect on the order of **tens of dollars per month** for light use, mos
 1. **Dashboard:** One Cloud Run **service** from your Docker image → always-on website.  
 2. **Daily updates:** One Cloud Run **Job** (same image, different command) triggered by **Cloud Scheduler** so the pipeline runs without you.  
 3. **Database:** Cloud SQL (or any Postgres) with `DATABASE_URL` in Secret Manager.  
-4. No more manual pipeline or dashboard runs — both are automated and hosted.
+4. No more manual pipeline or dashboard runs: both are automated and hosted.
 
 For step-by-step issues (e.g. IAM, Private IP, or Cloud SQL proxy), see [Cloud Run docs](https://cloud.google.com/run/docs) and [Cloud Run Jobs](https://cloud.google.com/run/docs/create-jobs).

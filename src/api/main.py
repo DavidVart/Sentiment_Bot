@@ -56,9 +56,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Options Agent Dashboard API", lifespan=lifespan)
+_cors_origins = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["http://localhost:4200", "http://localhost:8080"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

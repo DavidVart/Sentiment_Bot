@@ -27,7 +27,7 @@ def test_buy_and_hold_action_shape_and_values():
     assert action.shape == (4,)
     assert action.dtype in (np.int64, np.int32, int)
     assert np.all((action >= 0) & (action <= 2))
-    assert action[0] == 1 and action[1] == 1  # vega=0, delta=0
+    assert action[0] == 1 and action[1] == 2  # vega=0, delta=+1
 
 
 def test_fixed_long_vol_action():
@@ -35,7 +35,7 @@ def test_fixed_long_vol_action():
     action = policy.select_action(_obs_52())
     assert action.shape == (4,)
     assert action[0] == 2 and action[1] == 1  # vega=+1, delta=0
-    assert action[2] == 2 and action[3] == 2  # size=1.0, expiry=30D
+    assert action[2] == 1 and action[3] == 2  # size=0.5, expiry=30D
 
 
 def test_delta_neutral_action():

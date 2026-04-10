@@ -13,8 +13,8 @@
 set -e
 
 # --- Configuration (edit or override with env vars) ---
-PROJECT_ID="${PROJECT_ID:-sentiment-bot-487918}"
-PROJECT_NUMBER="${PROJECT_NUMBER:-722852346958}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID in env or .env}"
+PROJECT_NUMBER="${PROJECT_NUMBER:?Set PROJECT_NUMBER in env or .env (gcloud projects describe \$PROJECT_ID --format='value(projectNumber)')}"
 REGION="${REGION:-us-central1}"
 SERVICE_NAME="${SERVICE_NAME:-options-agent-dashboard}"
 JOB_NAME="${JOB_NAME:-options-agent-pipeline}"

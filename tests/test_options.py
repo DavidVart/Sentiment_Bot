@@ -473,7 +473,7 @@ def test_backfill_polygon_other_error_not_auth():
 
 
 def test_backfill_run_uses_yfinance_after_403():
-    """Full run_backfill_options switches to yfinance after first 403."""
+    """Full run_backfill_options switches to yfinance subprocess after Polygon 403."""
     import httpx
 
     from src.ingestion.backfill_options import run_backfill_options
@@ -495,7 +495,7 @@ def test_backfill_run_uses_yfinance_after_403():
         patch("src.ingestion.backfill_options.apply_migrations"),
         patch("src.ingestion.backfill_options.load_universe", return_value=["SPY"]),
         patch("src.ingestion.backfill_options.get_polygon_options_provider") as mock_poly_factory,
-        patch("src.ingestion.backfill_options.get_yfinance_options_provider") as mock_yf_factory,
+        patch("src.ingestion.backfill_options._yfinance_subprocess", return_value=yf_rows) as mock_yf_sub,
         patch("src.ingestion.backfill_options.get_connection"),
         patch("src.ingestion.backfill_options.write_options_snapshots") as mock_write,
     ):
@@ -503,14 +503,10 @@ def test_backfill_run_uses_yfinance_after_403():
         mock_poly.fetch_chain_snapshot.side_effect = polygon_exc
         mock_poly_factory.return_value = mock_poly
 
-        mock_yf = MagicMock()
-        mock_yf.fetch_chain_snapshot.return_value = yf_rows
-        mock_yf_factory.return_value = mock_yf
-
         run_backfill_options(symbols=["SPY"], snapshot_date=date(2026, 1, 13))
 
-    # yfinance was used and its rows were written
-    mock_yf.fetch_chain_snapshot.assert_called_once_with("SPY", snapshot_date=date(2026, 1, 13))
+    # yfinance subprocess was used and its rows were written
+    mock_yf_sub.assert_called_once_with("SPY", date(2026, 1, 13))
     mock_write.assert_called_once()
     written = mock_write.call_args[0][1]
     assert len(written) == 1
